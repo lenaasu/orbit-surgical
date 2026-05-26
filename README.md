@@ -1,5 +1,25 @@
 ![ORBIT-Surgical](media/teaser.png)
 
+# Orbit-Surgical Extensions for RL/IL 
+
+[![IsaacSim](https://img.shields.io/badge/IsaacSim-4.5.0-silver.svg)](https://docs.omniverse.nvidia.com/isaacsim/latest/overview.html)
+[![Isaac Lab](https://img.shields.io/badge/IsaacLab-2.x-silver)](https://isaac-sim.github.io/IsaacLab)
+[![Python](https://img.shields.io/badge/python-3.10-blue.svg)](https://docs.python.org/3/whatsnew/3.10.html)
+[![Ubuntu](https://img.shields.io/badge/Ubuntu-22.04-orange.svg)](https://releases.ubuntu.com/22.04/)
+
+This repository is forked from Orbit-Surgical and extended with:
+- trajectory export
+- trajectory visualization
+- API modifications
+- RL/IL experimental pipeline
+
+## Demo
+(Under construction...)
+
+---
+
+# Origical Orbit-Surgical README
+
 ---
 
 # ORBIT-Surgical
