@@ -18,7 +18,7 @@ This repository is forked from ORBIT-Surgical and extended with:
 
 
 
-# Origical Orbit-Surgical README
+# Origical ORBIT-Surgical README
 
 
 # ORBIT-Surgical
