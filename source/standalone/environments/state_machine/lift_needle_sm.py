@@ -19,7 +19,7 @@ It uses the `warp` library to run the state machine in parallel on the GPU.
 
 import argparse
 
-from omni.isaac.lab.app import AppLauncher
+from isaaclab.app import AppLauncher
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Pick and lift state machine for lift environments.")
@@ -33,7 +33,8 @@ AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
 # launch omniverse app
-app_launcher = AppLauncher(headless=args_cli.headless)
+# app_launcher = AppLauncher(headless=args_cli.headless)
+app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
 """Rest everything else."""
@@ -44,12 +45,12 @@ from collections.abc import Sequence
 
 import warp as wp
 
-from omni.isaac.lab.assets import RigidObject
-from omni.isaac.lab.assets.rigid_object.rigid_object_data import RigidObjectData
+from isaaclab.assets import RigidObject
+from isaaclab.assets.rigid_object.rigid_object_data import RigidObjectData
 
-from omni.isaac.lab_tasks.utils.parse_cfg import parse_env_cfg
+from isaaclab_tasks.utils import parse_env_cfg
 
-from omni.isaac.lab.utils.math import subtract_frame_transforms
+from isaaclab.utils.math import subtract_frame_transforms
 
 import orbit.surgical.tasks  # noqa: F401
 from orbit.surgical.tasks.surgical.lift.lift_env_cfg import LiftEnvCfg
@@ -250,42 +251,68 @@ def main():
         use_fabric=not args_cli.disable_fabric,
     )
     # create environment
-    env = gym.make("Isaac-Lift-Needle-PSM-IK-Abs-v0", cfg=env_cfg)
+    raw_env = gym.make("Isaac-Lift-Needle-PSM-IK-Abs-v0", cfg=env_cfg)
+    # raw_env = gym.make("Isaac-Lift-Needle-PSM-IK-Abs-v0", cfg=env_cfg, render_mode="PARTIAL_RENDERING")
+    # raw_env = gym.make("Isaac-Lift-Needle-PSM-IK-Abs-v0", cfg=env_cfg, render_mode=[None, 'human', 'rgb_array'])
+    # raw_env = gym.make("Isaac-Lift-Needle-PSM-IK-Abs-v0", cfg=env_cfg, render_mode="rgb_array")
+    # raw_env = gym.make("Isaac-Lift-Needle-PSM-IK-Abs-v0", cfg=env_cfg, render_mode="FULL_RENDERING")
+    
+    # record video
+    # raw_env = gym.wrappers.RecordVideo(
+    #     raw_env,
+    #     video_folder="./videos",
+    #     episode_trigger=lambda episode_id:True
+    #     )
+    
+    env = raw_env.unwrapped
     # reset environment at start
-    env.reset()
+    raw_env.reset()
     env.sim.step()
 
     # create action buffers (position + quaternion)
-    actions = torch.zeros(env.unwrapped.action_space.shape, device=env.unwrapped.device)
+    # actions = torch.zeros(env.unwrapped.action_space.shape, device=env.unwrapped.device)
+    # actions[:, 3] = 1.0
+
+    # # create state machine
+    # pick_sm = PickAndLiftSm(env_cfg.sim.dt * env_cfg.decimation, env.unwrapped.num_envs, env.unwrapped.device)
+
+    actions = torch.zeros(env.action_space.shape, device=env.device)
     actions[:, 3] = 1.0
 
-    # create state machine
-    pick_sm = PickAndLiftSm(env_cfg.sim.dt * env_cfg.decimation, env.unwrapped.num_envs, env.unwrapped.device)
+    pick_sm = PickAndLiftSm(env_cfg.sim.dt * env_cfg.decimation, env.num_envs, env.device)
 
+    # Create traj set
+    traj = []
+
+    step_cnt = 0
+    max_steps = 300
     while simulation_app.is_running():
         # run everything in inference mode
         with torch.inference_mode():
             # step environment
-            dones = env.step(actions)[-2]
+            # dones = env.step(actions)[-2]
+            dones = raw_env.step(actions)[-2]
+            
 
             # observations
             robot: RigidObject = env.scene["robot"]
             # -- end-effector frame
-            ee_frame_sensor = env.unwrapped.scene["ee_frame"]
-            tcp_rest_position = ee_frame_sensor.data.target_pos_w[..., 0, :].clone() - env.unwrapped.scene.env_origins
+            ee_frame_sensor = env.scene["ee_frame"]
+            tcp_rest_position = ee_frame_sensor.data.target_pos_w[..., 0, :].clone() - env.scene.env_origins
             tcp_rest_position_b, _ = subtract_frame_transforms(
                 robot.data.root_state_w[:, :3], robot.data.root_state_w[:, 3:7], tcp_rest_position
             )
             tcp_rest_orientation = ee_frame_sensor.data.target_quat_w[..., 0, :].clone()
             # -- object frame
-            object_data: RigidObjectData = env.unwrapped.scene["object"].data
-            object_position = object_data.root_pos_w - env.unwrapped.scene.env_origins
+            object_data: RigidObjectData = env.scene["object"].data
+            object_position = object_data.root_pos_w - env.scene.env_origins
             object_position_b, _ = subtract_frame_transforms(
                 robot.data.root_state_w[:, :3], robot.data.root_state_w[:, 3:7], object_position
             )
             object_orientation = object_data.root_quat_w
             # -- target object frame
-            desired_pose = env.unwrapped.command_manager.get_command("object_pose")
+            # desired_pose = env.unwrapped.command_manager.get_command("object_pose")
+            desired_pose = env.command_manager.get_command("object_pose")
 
             # advance state machine
             actions = pick_sm.compute(
@@ -294,12 +321,27 @@ def main():
                 desired_pose,
             )
 
+            # Add traj
+            if step_cnt % 5 == 0:
+                traj.append({
+                    "step": step_cnt,
+                    "ee_pos": tcp_rest_position.detach().cpu(),
+                    "needle_pos": object_position.detach().cpu(),
+                    "action": actions.detach().cpu(),
+                })
+
             # reset state machine
             if dones.any():
                 pick_sm.reset_idx(dones.nonzero(as_tuple=False).squeeze(-1))
-
+            
+            step_cnt += 1
+            if step_cnt > max_steps:
+                break
+    # Save traj
+    torch.save(traj, "lift_needle_traj.pt")
+    print("Saved trajectory to lift_needle_traj.pt")
     # close the environment
-    env.close()
+    raw_env.close()
 
 
 if __name__ == "__main__":
