@@ -18,7 +18,8 @@ from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
-from isaaclab.sensors.frame_transformer.frame_transformer_cfg import FrameTransformerCfg
+# from isaaclab.sensors.frame_transformer.frame_transformer_cfg import FrameTransformerCfg
+from isaaclab.sensors import CameraCfg, FrameTransformerCfg
 from isaaclab.sim.spawners.from_files.from_files_cfg import GroundPlaneCfg, UsdFileCfg
 from isaaclab.utils.configclass import configclass
 
@@ -62,6 +63,26 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         prim_path="/World/light",
         spawn=sim_utils.DomeLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
+
+    # # sensors
+    # camera = CameraCfg(
+    #     prim_path="{ENV_REGEX_NS}/Camera",
+    #     update_period=0.1,
+    #     height=64,
+    #     width=64,
+    #     data_types=["rgb"],
+    #     spawn=sim_utils.PinholeCameraCfg(
+    #         focal_length=24.0,
+    #         focus_distance=400.0,
+    #         horizontal_aperture=20.955,
+    #         clipping_range=(0.1, 1.0e5),
+    #     ),
+    #     offset=CameraCfg.OffsetCfg(
+    #         pos=(0.25, 0.0, 0.25),
+    #         rot=(0.707, 0.0, 0.707, 0.0),
+    #         convention="ros",
+    #     ),
+    # )
 
 
 ##
