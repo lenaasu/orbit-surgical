@@ -262,7 +262,7 @@ def main():
     
     # base_env.sim.step()
     print(type(raw_env))
-    print(type(raw_env.unwrapped))
+    print(type(base_env))
     # create action buffers (position + quaternion)
     actions = torch.zeros(base_env.action_space.shape, device=base_env.device)
     actions[:, 3] = 1.0
@@ -278,8 +278,10 @@ def main():
     while simulation_app.is_running() and step_cnt <= max_steps:
         # run everything in inference mode
         with torch.inference_mode():
-            # step environment
-            dones = raw_env.step(actions)[-2]
+            # step environment and reward frame
+            # dones = raw_env.step(actions)[-2]
+            obs_dict, reward, terminated, truncated, info = raw_env.step(actions)
+            dones = terminated | truncated
             # dones = base_env.step(actions)[-2]
 
             # observations
@@ -301,22 +303,29 @@ def main():
             # -- target object frame
             desired_pose = base_env.command_manager.get_command("object_pose")
 
+            
+
             # advance state machine
             actions = pick_sm.compute(
                 torch.cat([tcp_rest_position_b, tcp_rest_orientation], dim=-1),
                 torch.cat([object_position_b, object_orientation], dim=-1),
                 desired_pose,
             )
-
+            # print(info)
             # Add traj
-            if step_cnt % 5 == 0:
-                traj.append({
-                    "step": step_cnt,
-                    "ee_pos": tcp_rest_position.detach().cpu(),
-                    "object_pos": object_position.detach().cpu(),
-                    "action": actions.detach().cpu(),
-                    "ee_quat": tcp_rest_orientation.detach().cpu(),
-                })
+            # if step_cnt % 5 == 0:
+            traj.append({
+                "step": step_cnt,
+                "ee_pos": tcp_rest_position.detach().cpu(),
+                "ee_quat": tcp_rest_orientation.detach().cpu(),
+                "object_pos": object_position.detach().cpu(),
+                "object_quat": object_orientation.detach().cpu(),
+                "action": actions.detach().cpu(),
+                "reward": reward.detach().cpu(),
+                "terminated": terminated.detach().cpu(),
+                "truncated": truncated.detach().cpu()
+                
+            })
 
             # reset state machine
             if dones.any():
@@ -326,7 +335,8 @@ def main():
             if step_cnt > max_steps:
                 break
     # Save traj
-    torch.save(traj, "base_results/lift_block_traj_1.pt")
+    # torch.save(traj, "base_results/lift_block_traj_1.pt")
+    torch.save(traj, "lift_block_traj_1.pt")
     print("Saved trajectory to lift_block_traj.pt")
     # close the environment
     raw_env.close()
