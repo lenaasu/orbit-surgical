@@ -283,7 +283,10 @@ def main():
             obs_dict, reward, terminated, truncated, info = raw_env.step(actions)
             dones = terminated | truncated
             # dones = base_env.step(actions)[-2]
-
+            
+            # success
+            # object_listed = base_env.termination_manager.get_term["object_lifted"]
+            success = info["log"]["Episode_Termination/object_lifted"]
             # observations
             robot: RigidObject = base_env.scene["robot"]
             # -- end-effector frame
@@ -302,7 +305,7 @@ def main():
             object_orientation = object_data.root_quat_w
             # -- target object frame
             desired_pose = base_env.command_manager.get_command("object_pose")
-
+            
             
 
             # advance state machine
@@ -323,7 +326,9 @@ def main():
                 "action": actions.detach().cpu(),
                 "reward": reward.detach().cpu(),
                 "terminated": terminated.detach().cpu(),
-                "truncated": truncated.detach().cpu()
+                "truncated": truncated.detach().cpu(),
+                "object_lifted": success,
+                
                 
             })
 

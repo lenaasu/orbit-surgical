@@ -22,12 +22,19 @@ from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sensors import CameraCfg, FrameTransformerCfg
 from isaaclab.sim.spawners.from_files.from_files_cfg import GroundPlaneCfg, UsdFileCfg
 from isaaclab.utils.configclass import configclass
-
+import torch
 from . import mdp
 
 ##
 # Scene definition
 ##
+
+def object_lifted(
+        env: ManagerBasedRLEnvCfg,
+        threshold: float,
+) -> torch.Tensor:
+    object = env.scene["object"]
+    return object.data.root_pos_w[:, 2] > threshold
 
 
 @configclass
@@ -199,6 +206,11 @@ class TerminationsCfg:
 
     object_dropping = DoneTerm(
         func=mdp.root_height_below_minimum, params={"minimum_height": -0.05, "asset_cfg": SceneEntityCfg("object")}
+    )
+
+    # success condition
+    object_lifted = DoneTerm(
+        func=object_lifted, params={"threshold": 0.02},
     )
 
 

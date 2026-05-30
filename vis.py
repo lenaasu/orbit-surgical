@@ -16,6 +16,7 @@ steps = [x["step"] for x in traj]
 rewards = [x["reward"].item() for x in traj]
 terminated = [x["terminated"].item() for x in traj]
 truncated = [x["truncated"].item() for x in traj]
+success = [x["object_lifted"] for x in traj]
 
 # 2D top view
 plt.figure(figsize=(6, 6))
@@ -110,6 +111,17 @@ plt.ylabel("Truncated")
 plt.title("Truncated Curve")
 
 plt.savefig("results/truncated_1.png", dpi=300, bbox_inches="tight")
+plt.close()
+
+# success
+plt.figure(figsize=(8,4))
+
+plt.plot(steps, success)
+plt.xlabel("Step")
+plt.ylabel("Success")
+plt.title("Success Curve")
+
+plt.savefig("results/success_1.png", dpi=300, bbox_inches="tight")
 plt.close()
 
 # interactive 3D trajectory
