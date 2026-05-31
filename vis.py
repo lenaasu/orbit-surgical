@@ -1,4 +1,5 @@
 import os
+import math
 import torch
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -43,12 +44,14 @@ for i in range(len(success)):
             first_success_idx = i
         success_episodes += 1
         success_reward_sum += rewards[i]
-  
 episode_success_rate = success_episodes / len(success)
-success_reward_avg = success_reward_sum / success_episodes
+if success_episodes != 0:
+    success_reward_avg = success_reward_sum / success_episodes
+else:
+    success_reward_avg = 0
 
 episodes = len(success)/epi_length
-timeout_episodes = sum(timeout)
+timeout_episodes = math.ceil(sum(timeout) / epi_length)
 episode_timeout_rate = timeout_episodes / episodes
 # print(timeout)
 
