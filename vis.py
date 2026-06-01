@@ -8,8 +8,8 @@ import plotly.graph_objects as go
 # load trajectory
 # os.makedirs("results", exist_ok=True)
 
-FILE_NAME = "lift_b_1"
-num_envs = 1
+FILE_NAME = "lift_b_16_50"
+num_envs = 16
 DECIMATION = 4
 SIM_DT = 1.0 / 200.0
 EPISODE_LENGTH_S = 2.0

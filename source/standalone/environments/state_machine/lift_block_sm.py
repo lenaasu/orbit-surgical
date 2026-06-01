@@ -253,7 +253,7 @@ def main():
     # create environment
     raw_env = gym.make("Isaac-Lift-Block-PSM-IK-Abs-v0", cfg=env_cfg)
     base_env = raw_env.unwrapped
-    print(base_env.scene.keys())
+    # print(base_env.scene.keys())
     
     # reset environment at start
     raw_env.reset()
@@ -261,8 +261,8 @@ def main():
     base_env.sim.step()
     
     # base_env.sim.step()
-    print(type(raw_env))
-    print(type(base_env))
+    # print(type(raw_env))
+    # print(type(base_env))
     # create action buffers (position + quaternion)
     actions = torch.zeros(base_env.action_space.shape, device=base_env.device)
     actions[:, 3] = 1.0
@@ -274,12 +274,11 @@ def main():
     traj = []
 
     step_cnt = 0
-    max_steps = 300
+    max_steps = 5000
     while simulation_app.is_running() and step_cnt <= max_steps:
         # run everything in inference mode
         with torch.inference_mode():
-            # step environment and reward frame
-            # dones = raw_env.step(actions)[-2]
+            # step environment
             obs_dict, reward, terminated, truncated, info = raw_env.step(actions)
             dones = terminated | truncated
             # dones = base_env.step(actions)[-2]
@@ -287,6 +286,7 @@ def main():
             # success
             # object_listed = base_env.termination_manager.get_term["object_lifted"]
             success = info["log"]["Episode_Termination/object_lifted"]
+            timeout = info["log"]["Episode_Termination/time_out"]
             # observations
             robot: RigidObject = base_env.scene["robot"]
             # -- end-effector frame
@@ -328,6 +328,7 @@ def main():
                 "terminated": terminated.detach().cpu(),
                 "truncated": truncated.detach().cpu(),
                 "object_lifted": success,
+                "timeout": timeout,
                 
                 
             })
@@ -337,12 +338,11 @@ def main():
                 pick_sm.reset_idx(dones.nonzero(as_tuple=False).squeeze(-1))
             
             step_cnt += 1
-            if step_cnt > max_steps:
+            if step_cnt >= max_steps:
                 break
     # Save traj
-    # torch.save(traj, "base_results/lift_block_traj_1.pt")
-    torch.save(traj, "lift_block_traj_1.pt")
-    print("Saved trajectory to lift_block_traj.pt")
+    torch.save(traj, "lift_b_16_50.pt")
+    print("Saved trajectory to lift_b.pt")
     # close the environment
     raw_env.close()
     # base_env.close()
