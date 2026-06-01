@@ -264,10 +264,10 @@ def main():
     #     episode_trigger=lambda episode_id:True
     #     )
     
-    env = raw_env.unwrapped
+    base_env = raw_env.unwrapped
     # reset environment at start
     raw_env.reset()
-    env.sim.step()
+    base_env.sim.step()
 
     # create action buffers (position + quaternion)
     # actions = torch.zeros(env.unwrapped.action_space.shape, device=env.unwrapped.device)
@@ -276,43 +276,53 @@ def main():
     # # create state machine
     # pick_sm = PickAndLiftSm(env_cfg.sim.dt * env_cfg.decimation, env.unwrapped.num_envs, env.unwrapped.device)
 
-    actions = torch.zeros(env.action_space.shape, device=env.device)
+    actions = torch.zeros(base_env.action_space.shape, device=base_env.device)
     actions[:, 3] = 1.0
 
-    pick_sm = PickAndLiftSm(env_cfg.sim.dt * env_cfg.decimation, env.num_envs, env.device)
+    pick_sm = PickAndLiftSm(env_cfg.sim.dt * env_cfg.decimation, base_env.num_envs, base_env.device)
 
     # Create traj set
     traj = []
 
     step_cnt = 0
-    max_steps = 300
+    max_steps = 5000
     while simulation_app.is_running():
         # run everything in inference mode
         with torch.inference_mode():
             # step environment
-            # dones = env.step(actions)[-2]
-            dones = raw_env.step(actions)[-2]
+            obs_dict, reward, terminated, truncated, info = raw_env.step(actions)
+            dones = terminated | truncated
+            # dones = raw_env.step(actions)[-2]
+
+            # success
+            # object_listed = base_env.termination_manager.get_term["object_lifted"]
+            success = info["log"]["Episode_Termination/object_lifted"]
+            timeout = info["log"]["Episode_Termination/time_out"]
+            # print(base_env.max_episode_length)
+            # print("terminated:", terminated.sum().item())
+            # print("truncated:", truncated.sum().item())
+            # print("success:", success)
             
 
             # observations
-            robot: RigidObject = env.scene["robot"]
+            robot: RigidObject = base_env.scene["robot"]
             # -- end-effector frame
-            ee_frame_sensor = env.scene["ee_frame"]
-            tcp_rest_position = ee_frame_sensor.data.target_pos_w[..., 0, :].clone() - env.scene.env_origins
+            ee_frame_sensor = base_env.scene["ee_frame"]
+            tcp_rest_position = ee_frame_sensor.data.target_pos_w[..., 0, :].clone() - base_env.scene.env_origins
             tcp_rest_position_b, _ = subtract_frame_transforms(
                 robot.data.root_state_w[:, :3], robot.data.root_state_w[:, 3:7], tcp_rest_position
             )
             tcp_rest_orientation = ee_frame_sensor.data.target_quat_w[..., 0, :].clone()
             # -- object frame
-            object_data: RigidObjectData = env.scene["object"].data
-            object_position = object_data.root_pos_w - env.scene.env_origins
+            object_data: RigidObjectData = base_env.scene["object"].data
+            object_position = object_data.root_pos_w - base_env.scene.env_origins
             object_position_b, _ = subtract_frame_transforms(
                 robot.data.root_state_w[:, :3], robot.data.root_state_w[:, 3:7], object_position
             )
             object_orientation = object_data.root_quat_w
             # -- target object frame
             # desired_pose = env.unwrapped.command_manager.get_command("object_pose")
-            desired_pose = env.command_manager.get_command("object_pose")
+            desired_pose = base_env.command_manager.get_command("object_pose")
 
             # advance state machine
             actions = pick_sm.compute(
@@ -322,24 +332,31 @@ def main():
             )
 
             # Add traj
-            if step_cnt % 5 == 0:
-                traj.append({
-                    "step": step_cnt,
-                    "ee_pos": tcp_rest_position.detach().cpu(),
-                    "needle_pos": object_position.detach().cpu(),
-                    "action": actions.detach().cpu(),
-                })
+            # if step_cnt % 5 == 0:
+            traj.append({
+                "step": step_cnt,
+                "ee_pos": tcp_rest_position.detach().cpu(),
+                "object_pos": object_position.detach().cpu(),
+                "action": actions.detach().cpu(),
+                "action": actions.detach().cpu(),
+                "reward": reward.detach().cpu(),
+                "terminated": terminated.detach().cpu(),
+                "truncated": truncated.detach().cpu(),
+                "object_lifted": success,
+                "timeout": timeout,
+            })
+                # print(info)
 
             # reset state machine
             if dones.any():
                 pick_sm.reset_idx(dones.nonzero(as_tuple=False).squeeze(-1))
             
             step_cnt += 1
-            if step_cnt > max_steps:
+            if step_cnt >= max_steps:
                 break
     # Save traj
-    torch.save(traj, "lift_needle_traj.pt")
-    print("Saved trajectory to lift_needle_traj.pt")
+    torch.save(traj, "lift_n_16_50.pt")
+    print("Saved trajectory to lift_n.pt")
     # close the environment
     raw_env.close()
 
