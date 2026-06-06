@@ -188,7 +188,8 @@ class PickAndLiftSm:
 
         # approach above object offset
         self.offset = torch.zeros((self.num_envs, 7), device=self.device)
-        self.offset[:, 2] = 0.05
+        # self.offset[:, 2] = 0.05
+        self.offset[:, 2] = 0.01
         self.offset[:, -1] = 1.0  # warp expects quaternion as (x, y, z, w)
 
         # convert to warp
@@ -285,7 +286,7 @@ def main():
     traj = []
 
     step_cnt = 0
-    max_steps = 5000
+    max_steps = 800
     while simulation_app.is_running():
         # run everything in inference mode
         with torch.inference_mode():
@@ -329,7 +330,21 @@ def main():
                 torch.cat([tcp_rest_position_b, tcp_rest_orientation], dim=-1),
                 torch.cat([object_position_b, object_orientation], dim=-1),
                 desired_pose,
+                
             )
+            if step_cnt % 10 == 0:
+                print("step: ", step_cnt)
+                # print("ee pose input[0]: ", torch.cat([tcp_rest_position_b, tcp_rest_orientation], dim=-1))
+                # print("object pose input[0]: ", torch.cat([object_position_b, object_orientation], dim=-1))
+                # print("desired object pose[0]: ", desired_pose[0])
+                # print("actions shape: ", actions.shape)
+                # print("actions[0]: ", actions[0])
+                print("sm_state: ", pick_sm.sm_state)
+                print("gripper: ", actions[0, 7])
+                print("object_z: ", object_position_b[0, 2])
+                print("ee_z: ", tcp_rest_position_b[0, 2])
+                print("terminated: ", terminated)
+                print("truncated: ", truncated)
 
             # Add traj
             # if step_cnt % 5 == 0:
@@ -355,7 +370,7 @@ def main():
             if step_cnt >= max_steps:
                 break
     # Save traj
-    torch.save(traj, "lift_n_16_50.pt")
+    torch.save(traj, "lift_n_1_2.pt")
     print("Saved trajectory to lift_n.pt")
     # close the environment
     raw_env.close()

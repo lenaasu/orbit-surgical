@@ -34,7 +34,9 @@ def object_lifted(
         threshold: float,
 ) -> torch.Tensor:
     object = env.scene["object"]
-    return object.data.root_pos_w[:, 2] > threshold
+    current_z = object.data.root_pos_w[:, 2]
+    initial_z = object.data.default_root_state[:, 2]
+    return current_z > initial_z + threshold
 
 
 @configclass
@@ -264,8 +266,9 @@ class LiftEnvCfg(ManagerBasedRLEnvCfg):
         # general settings
         self.decimation = 4
         self.sim.render_interval = self.decimation
-        self.episode_length_s = 2.0
+        # self.episode_length_s = 2.0
+        self.episode_length_s = 8.0
         # simulation settings
-        self.sim.dt = 1.0 / 200.0
+        self.sim.dt = 1.0 / 200.0 # Episode length = episode_length_s / sim.dt
         self.viewer.eye = (0.2, 0.2, 0.1)
         self.viewer.lookat = (0.0, 0.0, 0.04)

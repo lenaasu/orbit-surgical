@@ -8,11 +8,11 @@ import plotly.graph_objects as go
 # load trajectory
 # os.makedirs("results", exist_ok=True)
 
-FILE_NAME = "lift_b_16_50"
-num_envs = 16
+FILE_NAME = "lift_n_1_2"
+num_envs = 1
 DECIMATION = 4
 SIM_DT = 1.0 / 200.0
-EPISODE_LENGTH_S = 2.0
+EPISODE_LENGTH_S = 8.0
 traj = torch.load(f"{FILE_NAME}.pt", map_location="cpu", weights_only=True)
 
 
@@ -94,79 +94,79 @@ print("-" * 45)
 
 
 # 2D top view
-# plt.figure(figsize=(6, 6))
+plt.figure(figsize=(6, 6))
 
-# plt.plot(ee[:, 0], ee[:, 1], label="EE Trajectory")
-# plt.plot(object[:, 0], object[:,1 ], label="object Trajectory")
+plt.plot(ee[:, 0], ee[:, 1], label="EE Trajectory")
+plt.plot(object[:, 0], object[:,1 ], label="object Trajectory")
 
-# plt.scatter(ee[0, 0], ee[0, 1], marker="o", label="EE Start")
-# plt.scatter(ee[-1, 0], ee[-1, 1], marker="x", label="EE End")
+plt.scatter(ee[0, 0], ee[0, 1], marker="o", label="EE Start")
+plt.scatter(ee[-1, 0], ee[-1, 1], marker="x", label="EE End")
 
-# plt.xlabel("X")
-# plt.ylabel("Y")
-# plt.title("Top View Trajectory")
-# plt.legend()
-# plt.axis("equal")
+plt.xlabel("X")
+plt.ylabel("Y")
+plt.title("Top View Trajectory")
+plt.legend()
+plt.axis("equal")
 
-# plt.savefig(f"results/{FILE_NAME}_top_view.png", dpi=300, bbox_inches="tight")
-# plt.close()
+plt.savefig(f"results/{FILE_NAME}_top_view.png", dpi=300, bbox_inches="tight")
+plt.close()
 
 
 # 3D trajectory
-# fig = plt.figure(figsize=(8, 6))
-# ax = fig.add_subplot(111, projection='3d')
+fig = plt.figure(figsize=(8, 6))
+ax = fig.add_subplot(111, projection='3d')
 
-# ax.plot(
-#     ee[:,0],
-#     ee[:,1],
-#     ee[:,2],
-#     label="EE"
-# )
+ax.plot(
+    ee[:,0],
+    ee[:,1],
+    ee[:,2],
+    label="EE"
+)
 
-# ax.plot(
-#     object[:,0],
-#     object[:,1],
-#     object[:,2],
-#     label="object"
-# )
+ax.plot(
+    object[:,0],
+    object[:,1],
+    object[:,2],
+    label="object"
+)
 
-# ax.set_xlabel("X")
-# ax.set_ylabel("Y")
-# ax.set_zlabel("Z")
+ax.set_xlabel("X")
+ax.set_ylabel("Y")
+ax.set_zlabel("Z")
 
-# ax.set_title("3D Trajectory")
-# ax.legend()
+ax.set_title("3D Trajectory")
+ax.legend()
 
-# plt.savefig(f"results/{FILE_NAME}_traj_3d.png", dpi=300, bbox_inches="tight")
-# plt.close()
-
-
-# # object lifting curve
-# plt.figure(figsize=(8,4))
-
-# plt.plot(object[:,2])
-
-# plt.xlabel("Step")
-# plt.ylabel("object Height (Z)")
-# plt.title("object Lifting")
-
-# plt.savefig(f"results/{FILE_NAME}_obj_h.png", dpi=300, bbox_inches="tight")
-# plt.close()
+plt.savefig(f"results/{FILE_NAME}_traj_3d.png", dpi=300, bbox_inches="tight")
+plt.close()
 
 
-# # reward curve
-# plt.figure(figsize=(8,4))
+# object lifting curve
+plt.figure(figsize=(8,4))
 
-# plt.plot(steps, rewards)
-# plt.xlabel("Step")
-# plt.ylabel("Reward")
-# plt.title("Reward Curve")
+plt.plot(object[:,2])
 
-# plt.savefig(f"results/{FILE_NAME}_rewards.png", dpi=300, bbox_inches="tight")
-# plt.close()
+plt.xlabel("Step")
+plt.ylabel("object Height (Z)")
+plt.title("object Lifting")
+
+plt.savefig(f"results/{FILE_NAME}_obj_h.png", dpi=300, bbox_inches="tight")
+plt.close()
 
 
-# terminated
+# reward curve
+plt.figure(figsize=(8,4))
+
+plt.plot(steps, rewards)
+plt.xlabel("Step")
+plt.ylabel("Reward")
+plt.title("Reward Curve")
+
+plt.savefig(f"results/{FILE_NAME}_rewards.png", dpi=300, bbox_inches="tight")
+plt.close()
+
+
+# # terminated
 # plt.figure(figsize=(8,4))
 
 # plt.plot(steps, terminated)
@@ -177,7 +177,7 @@ print("-" * 45)
 # plt.savefig(f"results/{FILE_NAME}_term.png", dpi=300, bbox_inches="tight")
 # plt.close()
 
-# truncated
+# # truncated
 # plt.figure(figsize=(8,4))
 
 # plt.plot(steps, truncated)
@@ -189,50 +189,50 @@ print("-" * 45)
 # plt.close()
 
 # success
-# plt.figure(figsize=(8,4))
+plt.figure(figsize=(8,4))
 
-# plt.plot(steps, success)
-# plt.xlabel("Step")
-# plt.ylabel("Success")
-# plt.title("Success Curve")
+plt.plot(steps, success)
+plt.xlabel("Step")
+plt.ylabel("Success")
+plt.title("Success Curve")
 
-# plt.savefig(f"results/{FILE_NAME}_success.png", dpi=300, bbox_inches="tight")
-# plt.close()
+plt.savefig(f"results/{FILE_NAME}_success.png", dpi=300, bbox_inches="tight")
+plt.close()
 
 # interactive 3D trajectory
-# fig_html = go.Figure()
+fig_html = go.Figure()
 
-# fig_html.add_trace(
-#     go.Scatter3d(
-#         x=ee[:, 0],
-#         y=ee[:, 1],
-#         z=ee[:, 2],
-#         mode="lines+markers",
-#         name="EE"
-#     )
-# )
+fig_html.add_trace(
+    go.Scatter3d(
+        x=ee[:, 0],
+        y=ee[:, 1],
+        z=ee[:, 2],
+        mode="lines+markers",
+        name="EE"
+    )
+)
 
-# fig_html.add_trace(
-#     go.Scatter3d(
-#         x=object[:, 0],
-#         y=object[:, 1],
-#         z=object[:, 2],
-#         mode="lines+markers",
-#         name="object"
-#     )
-# )
+fig_html.add_trace(
+    go.Scatter3d(
+        x=object[:, 0],
+        y=object[:, 1],
+        z=object[:, 2],
+        mode="lines+markers",
+        name="object"
+    )
+)
 
-# fig_html.update_layout(
-#     title="Interactive 3D Trajectory",
-#     scene=dict(
-#         xaxis_title="X",
-#         yaxis_title="Y",
-#         zaxis_title="Z",
-#         aspectmode="data"
-#     )
-# )
+fig_html.update_layout(
+    title="Interactive 3D Trajectory",
+    scene=dict(
+        xaxis_title="X",
+        yaxis_title="Y",
+        zaxis_title="Z",
+        aspectmode="data"
+    )
+)
 
-# fig_html.write_html(f"results/{FILE_NAME}_traj_3d.html")
+fig_html.write_html(f"results/{FILE_NAME}_traj_3d.html")
 
 
-# print(f"Saved results for {FILE_NAME}.")
+print(f"Saved results for {FILE_NAME}.")
