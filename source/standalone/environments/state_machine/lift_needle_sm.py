@@ -82,7 +82,7 @@ class PickSmWaitTime:
     REST = wp.constant(0.5)
     APPROACH_ABOVE_OBJECT = wp.constant(1.0)
     APPROACH_OBJECT = wp.constant(0.7)
-    GRASP_OBJECT = wp.constant(0.5)
+    GRASP_OBJECT = wp.constant(0.8)
     LIFT_OBJECT = wp.constant(2.0)
 
 
@@ -139,13 +139,19 @@ def infer_state_machine(
             sm_wait_time[tid] = 0.0
     elif state == PickSmState.LIFT_OBJECT:
         des_ee_pose[tid] = des_object_pose[tid]
+        # des_ee_pose[tid] = wp.transform_multiply(offset[tid], object_pose)
         gripper_state[tid] = GripperState.CLOSE
         # TODO: error between current and desired ee pose below threshold
         # wait for a while
         if sm_wait_time[tid] >= PickSmWaitTime.LIFT_OBJECT:
             # move to next state and reset wait time
             sm_state[tid] = PickSmState.LIFT_OBJECT
+            # sm_state[tid] = PickSmState.COMPLETE
             sm_wait_time[tid] = 0.0
+    # elif state == PickSmState.COMPLETE:
+    #     des_ee_pose[tid] = des_ee_pose[tid]
+    #     gripper_state[tid] = GripperState.CLOSE
+
     # increment wait time
     sm_wait_time[tid] = sm_wait_time[tid] + dt[tid]
 
@@ -286,7 +292,7 @@ def main():
     traj = []
 
     step_cnt = 0
-    max_steps = 800
+    max_steps = 1200
     while simulation_app.is_running():
         # run everything in inference mode
         with torch.inference_mode():
@@ -303,6 +309,9 @@ def main():
             # print("terminated:", terminated.sum().item())
             # print("truncated:", truncated.sum().item())
             # print("success:", success)
+            # object_z_world = object.data.root_pos_w[:, 2].clone()
+            # if episode_initial_object_z is None:
+            #     episode_initial_object_z = object_z_world.clone()
             
 
             # observations
@@ -341,8 +350,9 @@ def main():
                 # print("actions[0]: ", actions[0])
                 print("sm_state: ", pick_sm.sm_state)
                 print("gripper: ", actions[0, 7])
-                print("object_z: ", object_position_b[0, 2])
-                print("ee_z: ", tcp_rest_position_b[0, 2])
+                # print("object_z: ", object_position_b[0, 2])
+                # print("ee_z: ", tcp_rest_position_b[0, 2])
+                print("success: ", success)
                 print("terminated: ", terminated)
                 print("truncated: ", truncated)
 
@@ -360,17 +370,27 @@ def main():
                 "object_lifted": success,
                 "timeout": timeout,
             })
+            if success == 1:
+            #     print("Success at step:", step_cnt)
+            #     print("object_z: ", object_z_world[0])
+            #     print("initial_z: ", episode_initial_object_z[0])
+            #     # print("terminated: ", terminated)
+            #     # print("truncated: ", truncated)
+            #     # print("object_lifted: ", success)
+                torch.save(traj, "success_lift_needle_1.pt")
+                break
                 # print(info)
 
             # reset state machine
             if dones.any():
                 pick_sm.reset_idx(dones.nonzero(as_tuple=False).squeeze(-1))
+                episode_initial_object_z = None
             
             step_cnt += 1
             if step_cnt >= max_steps:
                 break
     # Save traj
-    torch.save(traj, "lift_n_1_2.pt")
+    torch.save(traj, "lift_n_1_3.pt")
     print("Saved trajectory to lift_n.pt")
     # close the environment
     raw_env.close()

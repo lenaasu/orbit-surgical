@@ -36,7 +36,7 @@ def object_lifted(
     object = env.scene["object"]
     current_z = object.data.root_pos_w[:, 2]
     initial_z = object.data.default_root_state[:, 2]
-    return current_z > initial_z + threshold
+    return (current_z - initial_z) > threshold
 
 
 @configclass
@@ -166,7 +166,7 @@ class EventCfg:
             "pose_range": {
                 "x": (-0.03, 0.03), 
                 "y": (-0.03, 0.03), 
-                "z": (0.005, 0.050)
+                "z": (0.00, 0.00)
                 },
             "velocity_range": {
                 "x": (0.0, 0.0),
