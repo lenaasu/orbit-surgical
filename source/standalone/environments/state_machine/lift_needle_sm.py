@@ -289,13 +289,26 @@ def main():
     pick_sm = PickAndLiftSm(env_cfg.sim.dt * env_cfg.decimation, base_env.num_envs, base_env.device)
 
     # Create traj set
-    traj = []
-
+    episode_traj = []
+    success_traj = []
+    episode_id = 1
+    episode_step = 0
+    # episode_length = env_cfg.episode_length_s / (env_cfg.sim.dt * env_cfg.decimation)
+    episode_length = base_env.max_episode_length
+    
+    
     step_cnt = 0
-    max_steps = 1200
+    success_cnt = 0
+    num_episodes = 3 # set number of episodes
+    target_success = 50 # set number of successful trajs
+    episode_saved = False # init bool for saving traj
+    # max_steps = num_episodes * episode_length
+    
     while simulation_app.is_running():
         # run everything in inference mode
         with torch.inference_mode():
+            # executed_actions = actions.clone()
+
             # step environment
             obs_dict, reward, terminated, truncated, info = raw_env.step(actions)
             dones = terminated | truncated
@@ -305,14 +318,6 @@ def main():
             # object_listed = base_env.termination_manager.get_term["object_lifted"]
             success = info["log"]["Episode_Termination/object_lifted"]
             timeout = info["log"]["Episode_Termination/time_out"]
-            # print(base_env.max_episode_length)
-            # print("terminated:", terminated.sum().item())
-            # print("truncated:", truncated.sum().item())
-            # print("success:", success)
-            # object_z_world = object.data.root_pos_w[:, 2].clone()
-            # if episode_initial_object_z is None:
-            #     episode_initial_object_z = object_z_world.clone()
-            
 
             # observations
             robot: RigidObject = base_env.scene["robot"]
@@ -334,15 +339,11 @@ def main():
             # desired_pose = env.unwrapped.command_manager.get_command("object_pose")
             desired_pose = base_env.command_manager.get_command("object_pose")
 
-            # advance state machine
-            actions = pick_sm.compute(
-                torch.cat([tcp_rest_position_b, tcp_rest_orientation], dim=-1),
-                torch.cat([object_position_b, object_orientation], dim=-1),
-                desired_pose,
-                
-            )
+
             if step_cnt % 10 == 0:
                 print("step: ", step_cnt)
+                print("episode: ", episode_id)
+                print("success_cnt: ", success_cnt)
                 # print("ee pose input[0]: ", torch.cat([tcp_rest_position_b, tcp_rest_orientation], dim=-1))
                 # print("object pose input[0]: ", torch.cat([object_position_b, object_orientation], dim=-1))
                 # print("desired object pose[0]: ", desired_pose[0])
@@ -352,17 +353,18 @@ def main():
                 print("gripper: ", actions[0, 7])
                 # print("object_z: ", object_position_b[0, 2])
                 # print("ee_z: ", tcp_rest_position_b[0, 2])
-                print("success: ", success)
+                # print("success: ", success)
                 print("terminated: ", terminated)
                 print("truncated: ", truncated)
+                print(info)
 
             # Add traj
             # if step_cnt % 5 == 0:
-            traj.append({
+            episode_traj.append({
                 "step": step_cnt,
+                "sm_state": pick_sm.sm_state.detach().cpu(),
                 "ee_pos": tcp_rest_position.detach().cpu(),
                 "object_pos": object_position.detach().cpu(),
-                "action": actions.detach().cpu(),
                 "action": actions.detach().cpu(),
                 "reward": reward.detach().cpu(),
                 "terminated": terminated.detach().cpu(),
@@ -370,28 +372,60 @@ def main():
                 "object_lifted": success,
                 "timeout": timeout,
             })
-            if success == 1:
-            #     print("Success at step:", step_cnt)
-            #     print("object_z: ", object_z_world[0])
-            #     print("initial_z: ", episode_initial_object_z[0])
-            #     # print("terminated: ", terminated)
-            #     # print("truncated: ", truncated)
-            #     # print("object_lifted: ", success)
-                torch.save(traj, "success_lift_needle_1.pt")
-                break
-                # print(info)
-
+            # if success == 1:
+            if success > 0 and not episode_saved and len(episode_traj) > 50:
+                success_cnt += 1
+                episode_saved = True
+                
+                torch.save(episode_traj[:-1], f"lift_n_1_success_ep{episode_id}.pt")
+                # print(f"Saved success traj at ep{episode_id}.")
+                
+       
             # reset state machine
-            if dones.any():
+            if dones.any() or success > 0:
+                # if success > 0:
+                #     success_cnt += 1
+                #     torch.save(episode_traj, f"lift_n_1_3_success_ep{episode_id}.pt")
+                    # print(f"Saved success traj at ep{episode_id}.")
+                    
+
                 pick_sm.reset_idx(dones.nonzero(as_tuple=False).squeeze(-1))
+                episode_traj = []
+                episode_id += 1
+                episode_step = 0
+                episode_saved = False
+
                 episode_initial_object_z = None
+                raw_env.reset()
+                base_env.sim.step()
+                actions = torch.zeros(base_env.action_space.shape, device=base_env.device)
+                actions[:, 3] = 1.0
+
+                step_cnt += 1
+
+                # if episode_id > num_episodes:
+                #     break
+                
+                if success_cnt >= target_success:
+                    break
+                
+                continue
             
-            step_cnt += 1
-            if step_cnt >= max_steps:
-                break
+            else:
+                episode_step += 1
+
+                # advance state machine
+                actions = pick_sm.compute(
+                    torch.cat([tcp_rest_position_b, tcp_rest_orientation], dim=-1),
+                    torch.cat([object_position_b, object_orientation], dim=-1),
+                    desired_pose,
+                    
+                )
+                step_cnt += 1
+            
     # Save traj
-    torch.save(traj, "lift_n_1_3.pt")
-    print("Saved trajectory to lift_n.pt")
+    # torch.save(episode_traj, "lift_n_1_3.pt")
+    # print("Saved trajectory to lift_n.pt")
     # close the environment
     raw_env.close()
 
