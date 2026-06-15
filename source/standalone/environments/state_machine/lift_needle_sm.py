@@ -344,33 +344,35 @@ def main():
                 print("step: ", step_cnt)
                 print("episode: ", episode_id)
                 print("success_cnt: ", success_cnt)
+                print("obs_dict_policy: ", obs_dict["policy"])
                 # print("ee pose input[0]: ", torch.cat([tcp_rest_position_b, tcp_rest_orientation], dim=-1))
                 # print("object pose input[0]: ", torch.cat([object_position_b, object_orientation], dim=-1))
                 # print("desired object pose[0]: ", desired_pose[0])
                 # print("actions shape: ", actions.shape)
                 # print("actions[0]: ", actions[0])
                 print("sm_state: ", pick_sm.sm_state)
-                print("gripper: ", actions[0, 7])
+                # print("gripper: ", actions[0, 7])
                 # print("object_z: ", object_position_b[0, 2])
                 # print("ee_z: ", tcp_rest_position_b[0, 2])
                 # print("success: ", success)
                 print("terminated: ", terminated)
                 print("truncated: ", truncated)
-                print(info)
+                # print(info)
 
             # Add traj
             # if step_cnt % 5 == 0:
             episode_traj.append({
                 "step": step_cnt,
                 "sm_state": pick_sm.sm_state.detach().cpu(),
-                "ee_pos": tcp_rest_position.detach().cpu(),
-                "object_pos": object_position.detach().cpu(),
+                "obs": obs_dict["policy"].cpu(),
+                # "ee_pos": tcp_rest_position.detach().cpu(),
+                # "object_pos": object_position.detach().cpu(),
                 "action": actions.detach().cpu(),
                 "reward": reward.detach().cpu(),
                 "terminated": terminated.detach().cpu(),
                 "truncated": truncated.detach().cpu(),
                 "object_lifted": success,
-                "timeout": timeout,
+                # "timeout": timeout,
             })
             # if success == 1:
             if success > 0 and not episode_saved and len(episode_traj) > 50:
