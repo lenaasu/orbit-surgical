@@ -21,13 +21,16 @@ from imitation.util.util import make_vec_env
 #     terminal: bool
 #     """Does this trajectory end in a terminal state?"""
 
-trajs = []
-traj_dir = Path(".")
+
+IL_DIR = Path(__file__).resolve().parent
+traj_dir = IL_DIR / "data" / "lift_n_trajs_50"
+save_path = IL_DIR / "policies" / "bc_lift_n_policy_2.zip"
+
+# load trajs
 traj_files = sorted(
     traj_dir.glob("lift_n_1_success_ep*.pt"),
     key=lambda p: int(re.search(r"ep(\d+)", p.stem).group(1)),
 )
-
 
 all_obs = []
 all_acts = []
@@ -94,7 +97,8 @@ bc_trainer = bc.BC(
     demonstrations=transitions,
     rng=rng,
 )
-bc_trainer.train(n_epochs=50)
-bc_trainer.policy.save("bc_lift_n_policy.zip")
+bc_trainer.train(n_epochs=1)
+bc_trainer.policy.save(str(save_path))
+print(f"Saved BC policy to {save_path}.")
 # reward, _ = evaluate_policy(bc_trainer.policy, env, 10)
 # print("Reward: ", reward)
