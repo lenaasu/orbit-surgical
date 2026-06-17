@@ -49,24 +49,26 @@ class AnalyzeTrajs:
                 "total_rewards": sum(rewards),
                 "mean_rewards": np.mean(rewards),
                 "final_reward": rewards[-1],
-                "sm_state": sm_state_counts
+                # "sm_state": sm_state_counts
             })
 
-            
+
         df = pd.DataFrame(rows)
         df.to_csv(save_stats_path, index=False)
 
         summary_df = pd.DataFrame([{
-            "num_trajs": len(traj),
-            "mean_len": np.mean(lengths),
-            "std_len": np.std(lengths),
-            "mean_reward": np.mean(total_rewards),
-            "std_reward": np.std(total_rewards),
+            "num_trajs": len(df),
+            "mean_len": df["length"].mean(),
+            "std_len": df["length"].std(),
+            "mean_reward": df["total_rewards"].mean(),
+            "std_reward": df["total_rewards"].std(),
+            "worst_idx": df["total_rewards"].idxmin(),
+            "best_idx": df["total_rewards"].idxmax(),
             # "mean_max_height": np.mean(max_heights),
             # "std_max_height": np.std(max_heights),
             # "mean_final_height": np.mean(final_heights),
             # "std_final_height": np.std(final_heights),
-            "sm_state_counts": sm_state_counts,
+            # "sm_state_counts": sm_state_counts,
         }])
         summary_df.to_csv(save_summary_path, index=False)
 

@@ -300,7 +300,7 @@ def main():
     step_cnt = 0
     success_cnt = 0
     num_episodes = 3 # set number of episodes
-    target_success = 50 # set number of successful trajs
+    target_success = 2 # set number of successful trajs
     episode_saved = False # init bool for saving traj
     # max_steps = num_episodes * episode_length
     
@@ -365,8 +365,8 @@ def main():
                 "step": step_cnt,
                 "sm_state": pick_sm.sm_state.detach().cpu(),
                 "obs": obs_dict["policy"].cpu(),
-                # "ee_pos": tcp_rest_position.detach().cpu(),
-                # "object_pos": object_position.detach().cpu(),
+                "ee_pos": tcp_rest_position.detach().cpu(),
+                "object_pos": object_position.detach().cpu(),
                 "action": actions.detach().cpu(),
                 "reward": reward.detach().cpu(),
                 "terminated": terminated.detach().cpu(),
