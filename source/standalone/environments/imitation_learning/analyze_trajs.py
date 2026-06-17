@@ -19,27 +19,21 @@ class AnalyzeTrajs:
     def summarize(self, save_stats_path, save_summary_path):
         """Summarize the properties (length, total_reward, height) of trajectory files."""
 
-        lengths = []
-        total_rewards = []
-        # final_rewards = []
-        # max_heights = []
-        # final_heights = [] 
-        sm_state_counts = {}
+        # sm_state_counts = {}
         rows = []
-
 
         for traj_file in self.traj_files:
             traj = torch.load(traj_file, map_location="cpu", weights_only=True)
             rewards = [x["reward"].float().mean().item() for x in traj]
             
-            # total_rewards.append(sum(rewards))
-            # final_rewards.append(rewards[-1])
-            # object_pos = torch.cat([x["object_pos"] for x in traj], dim=0)
-            # z = object_pos[:, 2].cpu().numpy()
-            # max_heights.append(z.max())
-            # final_heights.append(z[-1])
+          
+            object_pos = torch.cat([x["object_pos"] for x in traj], dim=0)
+            z = object_pos[:, 2]
+            max_height = z.max().item()
+            final_height = z[-1].item()
 
             # states = torch.cat([x["sm_state"].flatten() for x in traj]).numpy()
+            states = [int(x["sm_state"].item()) for x in traj]
             # for s in states:
             #     s = int(s)
             #     sm_state_counts[s] = sm_state_counts.get(s, 0) + 1
@@ -49,7 +43,13 @@ class AnalyzeTrajs:
                 "total_rewards": sum(rewards),
                 "mean_rewards": np.mean(rewards),
                 "final_reward": rewards[-1],
-                # "sm_state": sm_state_counts
+                "max_heights": max_height,
+                "final_heights": final_height,
+                "REST_state": states.count(0),
+                "APPROACH_ABOVE_OBJECT_state": states.count(1),
+                "APPROACH_OBJECT_state": states.count(2),
+                "GRASP_OBJECT_state": states.count(3),
+                "LIFT_OBJECT_state": states.count(4),
             })
 
 
@@ -64,10 +64,10 @@ class AnalyzeTrajs:
             "std_reward": df["total_rewards"].std(),
             "worst_idx": df["total_rewards"].idxmin(),
             "best_idx": df["total_rewards"].idxmax(),
-            # "mean_max_height": np.mean(max_heights),
-            # "std_max_height": np.std(max_heights),
-            # "mean_final_height": np.mean(final_heights),
-            # "std_final_height": np.std(final_heights),
+            "mean_max_height": df["max_heights"].mean(),
+            "std_max_height": df["max_heights"].std(),
+            "mean_final_height": df["final_heights"].mean(),
+            "std_final_height": df["final_heights"].std(),
             # "sm_state_counts": sm_state_counts,
         }])
         summary_df.to_csv(save_summary_path, index=False)
@@ -80,9 +80,9 @@ class AnalyzeTrajs:
 
 def main():    
     IL_DIR = Path(__file__).resolve().parent
-    traj_dir = IL_DIR / "data" / "lift_n_trajs_50"
-    save_stats_path = IL_DIR / "results" / "lift_n_50_stats.csv"
-    save_summary_path = IL_DIR / "results" / "lift_n_50_summary.csv"
+    traj_dir = IL_DIR / "data" / "lift_n_trajs_100"
+    save_stats_path = IL_DIR / "results" / "lift_n_100_stats.csv"
+    save_summary_path = IL_DIR / "results" / "lift_n_100_summary.csv"
 
     # # load trajs
     # traj_files = sorted(
