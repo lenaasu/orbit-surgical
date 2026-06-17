@@ -363,12 +363,15 @@ def main():
             # if step_cnt % 5 == 0:
             episode_traj.append({
                 "step": step_cnt,
+                "episode_id": episode_id,
                 "sm_state": pick_sm.sm_state.detach().cpu(),
+
                 "obs": obs_dict["policy"].cpu(),
-                "ee_pos": tcp_rest_position.detach().cpu(),
-                "object_pos": object_position.detach().cpu(),
                 "action": actions.detach().cpu(),
                 "reward": reward.detach().cpu(),
+                "ee_pos": tcp_rest_position.detach().cpu(),
+                "object_pos": object_position.detach().cpu(),
+                
                 "terminated": terminated.detach().cpu(),
                 "truncated": truncated.detach().cpu(),
                 "object_lifted": success,
