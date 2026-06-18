@@ -12,7 +12,7 @@ Script to run a trained Behavior Cloning policy to pick and lift the suture need
     ${IsaacLab_PATH}/isaaclab.sh -p source/standalone/environments/imitation_learning/eval_bc.py
 
     ~/IsaacLab/isaaclab.sh -p source/standalone/environments/imitation_learning/eval_bc.py \
-  --task Orbit-Surgical-Lift-Needle-IK-Abs-v0 \
+  --task Isaac-Lift-Needle-PSM-IK-Abs-v0 \
   --checkpoint source/standalone/environments/imitation_learning/policies/bc_lift_n_50_policy_30.zip
 """
 
@@ -46,13 +46,10 @@ import gymnasium as gym
 import torch
 
 from pathlib import Path
-from stable_baseline3.common.policies import ActorCriticPolicy
-
+from stable_baselines3.common.policies import ActorCriticPolicy
 from isaaclab_tasks.utils import parse_env_cfg
-
 import orbit.surgical.tasks  # noqa: F401
-# from orbit.surgical.tasks.surgical.lift.lift_env_cfg import LiftEnvCfg
-# from imitation_learning.policies import bc_lift_n_50_policy_30, 
+
 
 def main():
     """Run a trained policy from robomimic with Isaac Lab environment."""
@@ -85,7 +82,8 @@ def main():
         # run everything in inference mode
         with torch.inference_mode():
             # compute actions
-            actions = policy(obs)
+            # actions = policy(obs)
+            actions = policy._predict(obs, deterministic=True)
             # actions = torch.from_numpy(actions).to(device=device).view(1, env.action_space.shape[1])
             # apply actions
             # obs_dict = env.step(actions)[0]
