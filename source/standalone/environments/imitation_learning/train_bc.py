@@ -23,8 +23,8 @@ from imitation.util.util import make_vec_env
 
 
 IL_DIR = Path(__file__).resolve().parent
-traj_dir = IL_DIR / "data" / "lift_n_trajs_100"
-save_path = IL_DIR / "policies" / "bc_lift_n_100_policy_50.zip"
+traj_dir = IL_DIR / "data" / "lift_n_trajs_100_v2"
+save_path = IL_DIR / "policies" / "bc_lift_n_100v2_policy_30.zip"
 
 # load trajs
 traj_files = sorted(
@@ -97,7 +97,7 @@ bc_trainer = bc.BC(
     demonstrations=transitions,
     rng=rng,
 )
-bc_trainer.train(n_epochs=50)
+bc_trainer.train(n_epochs=30)
 bc_trainer.policy.save(str(save_path))
 print(f"Saved BC policy to {save_path}.")
 # reward, _ = evaluate_policy(bc_trainer.policy, env, 10)
