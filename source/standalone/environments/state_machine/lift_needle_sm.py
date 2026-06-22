@@ -300,7 +300,7 @@ def main():
     step_cnt = 0
     success_cnt = 0
     num_episodes = 3 # set number of episodes
-    target_success = 50 # set number of successful trajs
+    target_success = 100 # set number of successful trajs
     episode_saved = False # init bool for saving traj
     # max_steps = num_episodes * episode_length
     
@@ -316,8 +316,10 @@ def main():
 
             # success
             # object_listed = base_env.termination_manager.get_term["object_lifted"]
-            success = info["log"]["Episode_Termination/object_lifted"]
-            timeout = info["log"]["Episode_Termination/time_out"]
+            success_log = info["log"]["Episode_Termination/object_lifted"]
+            # success_cnt += 1
+            timeout_log = info["log"]["Episode_Termination/time_out"]
+            # timeout_cnt += 1
 
             # observations
             robot: RigidObject = base_env.scene["robot"]
@@ -374,20 +376,20 @@ def main():
                 
                 "terminated": terminated.detach().cpu(),
                 "truncated": truncated.detach().cpu(),
-                "object_lifted": success,
-                # "timeout": timeout,
+                "object_lifted_log": success_log,
+                "timeout_log": timeout_log,
             })
             # if success == 1:
-            if success > 0 and not episode_saved and len(episode_traj) > 50:
+            if success_log > 0 and not episode_saved and len(episode_traj) > 50:
                 success_cnt += 1
                 episode_saved = True
                 
-                torch.save(episode_traj[:-1], f"lift_n_1_success_ep{episode_id}.pt")
+                torch.save(episode_traj, f"source/standalone/environments/imitation_learning/lift_n_trajs_100_v2/lift_n_1_success_ep{episode_id}.pt")
                 # print(f"Saved success traj at ep{episode_id}.")
                 
        
             # reset state machine
-            if dones.any() or success > 0:
+            if dones.any() or success_log > 0:
                 # if success > 0:
                 #     success_cnt += 1
                 #     torch.save(episode_traj, f"lift_n_1_3_success_ep{episode_id}.pt")
