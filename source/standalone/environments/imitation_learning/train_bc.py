@@ -1,4 +1,5 @@
 import torch, re
+import argparse
 from pathlib import Path
 import numpy as np
 import gymnasium as gym
@@ -9,6 +10,18 @@ from imitation.data import rollout
 from imitation.data.wrappers import RolloutInfoWrapper
 from imitation.policies.serialize import load_policy
 from imitation.util.util import make_vec_env
+
+parser = argparse.ArgumentParser(description="Train BC policy using imitation for Isaac Lab environments.")
+parser.add_argument(
+    "--num_envs", type=int, default=1, help="Number of environments to simulate."
+)
+parser.add_argument(
+    "--task", 
+    type=str, 
+    default="Isaac-Lift-Needle-PSM-IK-Abs-Play-v0", 
+    help="Name of the task."
+)
+
 
 # @dataclasses.dataclass(frozen=True)
 # class Trajectory:
@@ -23,8 +36,8 @@ from imitation.util.util import make_vec_env
 
 
 IL_DIR = Path(__file__).resolve().parent
-traj_dir = IL_DIR / "data" / "lift_n_trajs_100_v2"
-save_path = IL_DIR / "policies" / "bc_lift_n_100v2_policy_30.zip"
+traj_dir = IL_DIR / "data" / "lift_n_trajs_1"
+save_path = IL_DIR / "policies" / "bc_lift_n_1_policy_500.zip"
 
 # load trajs
 traj_files = sorted(
@@ -42,10 +55,11 @@ for traj_file in traj_files:
     traj = torch.load(traj_file, map_location="cpu", weights_only=True)
 
     for i in range(len(traj) - 1):
-        all_obs.append(traj[i]["obs"].flatten().numpy())
-        all_acts.append(traj[i]["action"].flatten().numpy())
+        step = traj[i]
+        all_obs.append(step["obs"].flatten().numpy())
+        all_acts.append(step["action"].flatten().numpy())
         all_next_obs.append(traj[i + 1]["obs"].flatten().numpy())
-        all_dones.append(bool(traj[i]["terminated"].item() or traj[i]["truncated"].item()))
+        all_dones.append(bool(step["terminated"].item() or step["truncated"].item()))
         all_infos.append({})
 
 obs = np.asarray(all_obs, dtype=np.float32)
@@ -53,6 +67,18 @@ acts = np.asarray(all_acts, dtype=np.float32)
 next_obs = np.asarray(all_next_obs, dtype=np.float32)
 dones = np.asarray(all_dones, dtype=bool)
 infos = np.asarray(all_infos, dtype=object)
+
+print("obs.shape: ", obs.shape)
+print("acts.shape: ", acts.shape)
+
+print("obs min&max: ", obs.min(), obs.max())
+print("acts min&max: ", acts.min(), acts.max())
+
+print("obs sum: ", np.isnan(obs).sum())
+print("acts sum: ", np.isnan(acts).sum())
+
+print("obs[:5]=", obs[:5])
+print("acts[:5]=", acts[:5])
 
 transitions = Transitions(
     obs=obs,
@@ -62,8 +88,7 @@ transitions = Transitions(
     infos=infos,
 )
 
-print(obs.shape)
-print(acts.shape)
+
 rng = np.random.default_rng(0)
 action_space = gym.spaces.Box(
     low=-1.0,
@@ -96,8 +121,9 @@ bc_trainer = bc.BC(
     action_space=action_space,
     demonstrations=transitions,
     rng=rng,
+    batch_size=32,
 )
-bc_trainer.train(n_epochs=30)
+bc_trainer.train(n_epochs=500)
 bc_trainer.policy.save(str(save_path))
 print(f"Saved BC policy to {save_path}.")
 # reward, _ = evaluate_policy(bc_trainer.policy, env, 10)

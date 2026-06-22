@@ -32,12 +32,12 @@ parser.add_argument(
 parser.add_argument(
     "--task", 
     type=str, 
-    default="Isaac-Lift-Needle-PSM-IK-Abs-v0", 
+    default="Isaac-Lift-Needle-PSM-IK-Abs-Play-v0", 
     help="Name of the task."
 )
 parser.add_argument(
     "--checkpoint", type=str,
-    default="source/standalone/environments/imitation_learning/policies/bc_lift_n_50_policy_30.zip", 
+    default="source/standalone/environments/imitation_learning/policies/bc_lift_n_1_policy_200.pt", 
     help="Pytorch model checkpoint to load."
 )
 
@@ -58,6 +58,7 @@ import torch
 from stable_baselines3.common.policies import ActorCriticPolicy
 from isaaclab_tasks.utils import parse_env_cfg
 import orbit.surgical.tasks  # noqa: F401
+from train_bc_mse import BCPolicy
 
 
 def main():
@@ -72,18 +73,43 @@ def main():
     env = gym.make(args_cli.task, cfg=env_cfg)
 
     IL_DIR = Path(__file__).resolve().parent
-    checkpoint = args_cli.checkpoint
-    traj_path = IL_DIR / "data" / "lift_n_trajs_50" / "lift_n_1_success_ep1.pt"
+    checkpoint_path = args_cli.checkpoint
+    # traj_path = IL_DIR / "policies" / "bc_lift_n_1_policy_200.pt"
 
-    # load sample traj
-    traj = torch.load(traj_path, map_location=args_cli.device, weights_only=True)
-    
+    # load data
+    checkpoint = torch.load(checkpoint_path, map_location=args_cli.device, weights_only=True)
+    # traj = torch.load(traj_path, map_location=args_cli.device, weights_only=True)
+
 
     # acquire device
     # device = TorchUtils.get_torch_device(try_to_use_cuda=True)
     # restore policy
     # policy = ActorCriticPolicy.load(checkpoint, device=args_cli.device)
-    # policy.eval()
+    policy = BCPolicy(obs_dim=checkpoint["obs_dim"], act_dim=checkpoint["act_dim"]).to(args_cli.device)
+    policy.load_state_dict(checkpoint["model_state_dict"])
+    policy.eval()
+
+    # print("=" * 50)
+    # print("Demo Obs -> BC Action Check")
+    # print("=" * 50)
+
+    # for idx in [0, 20, 50, 100]:
+    #     demo_obs = traj[idx]["obs"].to(args_cli.device)
+    #     demo_act = traj[idx]["action"].to(args_cli.device)
+
+    #     with torch.inference_mode():
+    #         pred_act = policy._predict(
+    #             demo_obs,
+    #             deterministic=True
+    #         )
+
+    #     print(f"\nStep {idx}")
+    #     print("Demo:", demo_act.cpu().numpy().round(4))
+    #     print("Pred:", pred_act.cpu().numpy().round(4))
+
+    #     err = torch.abs(pred_act - demo_act).mean().item()
+    #     print("Mean Abs Error:", err)
+
 
     # reset environment
     obs_dict, info = env.reset()
@@ -104,119 +130,122 @@ def main():
     total_rewards = []
     episode_lengths = []
     
-    with torch.inference_mode():
-        for i, data in enumerate(traj):
-            if not simulation_app.is_running():
-                break
+    # with torch.inference_mode():
+    #     actions = policy(obs)
+    #     actions = torch.clamp(actions, -1.0, 1.0)
+    # # with torch.inference_mode():
+    #     for i, data in enumerate(checkpoint):
+    #         if not simulation_app.is_running():
+    #             break
 
-            actions = data["action"].to(env.device)
-            if actions.ndim == 1:
-                actions = actions.unsqueeze(0)
+    # #         actions = data["action"].to(env.device)
+    # #         if actions.ndim == 1:
+    # #             actions = actions.unsqueeze(0)
 
-            obs, rewards, terminated, truncated, info = env.step(actions)
-            episode_reward += rewards.mean().item()
-            
-            success = info["log"]["Episode_Termination/object_lifted"]
-            timeout = info["log"]["Episode_Termination/time_out"]
-
-            print(
-                "traj index:", i,
-                "saved step:", data["step"],
-                "action shape:", actions.shape,
-                "reward:", rewards,
-                "success:", success,
-                "timeout:", timeout,
-                "terminated:", terminated,
-                "truncated:", truncated,
-            )
-
-            print("traj length:", len(traj))
-            print("first saved step:", traj[0]["step"])
-            print("last saved step:", traj[-1]["step"])
-            print("last object_lifted in saved traj:", traj[-1]["object_lifted"])
-
-            if (terminated | truncated).any():
-                print("Episode ended at replay step:", i)
-                break
-
-    print("Replay total reward:", episode_reward)
-    
-    # simulate environment
-    # while simulation_app.is_running():
-    #     # run everything in inference mode
-    #     with torch.inference_mode():
-    #         # compute actions
-    #         # actions = policy._predict(obs, deterministic=True)
-    #         for i, data in enumerate(traj):
-    #             actions = data["action"].to(env.device)
-    #             if actions.ndim == 1:
-    #                 actions = actions.unsqueeze(0)
-    #             # actions = actions.to(env.device)
-
-            
-            
-    #         # apply actions
-    #         # obs_dict = env.step(actions)[0]
-    #         obs_dict, rewards, terminated, truncated, info = env.step(actions)
-    #         # only cares about policy observations
-    #         obs = obs_dict["policy"].to(args_cli.device)
-    
-
+    #         obs, rewards, terminated, truncated, info = env.step(actions)
     #         episode_reward += rewards.mean().item()
-    #         episode_step += 1
-
+            
     #         success = info["log"]["Episode_Termination/object_lifted"]
     #         timeout = info["log"]["Episode_Termination/time_out"]
 
-
-    #         # print("obs", obs.shape, obs[0, :10])
-    #         # print("actions", actions.shape, actions[0])
     #         print(
-    #             "step:", data["step"],
+    #             "traj index:", i,
+    #             "saved step:", data["step"],
     #             "action shape:", actions.shape,
-    #             "action:", actions[0],
+    #             "reward:", rewards,
+    #             "success:", success,
+    #             "timeout:", timeout,
     #             "terminated:", terminated,
     #             "truncated:", truncated,
     #         )
-            
-    #         if success:
-    #             success_cnt += 1
-    #             success_steps.append(episode_step)
-    #             episode_lengths.append(episode_step)
-            
-    #         if timeout:
-    #             timeout_cnt += 1
+
+    #         print("traj length:", len(traj))
+    #         print("first saved step:", traj[0]["step"])
+    #         print("last saved step:", traj[-1]["step"])
+    #         print("last object_lifted in saved traj:", traj[-1]["object_lifted_log"])
 
     #         if (terminated | truncated).any():
-    #             episode_id += 1
-    #             total_rewards.append(episode_reward)
-    #             episode_lengths.append(episode_step)
-                
-    #             # reset
-    #             episode_reward = 0.0
-    #             episode_step = 0
+    #             print("Episode ended at replay step:", i)
+    #             break
 
-    #             obs_dict, _ = env.reset()
-    #             obs = obs_dict["policy"].to(args_cli.device)
+    # print("Replay total reward:", episode_reward)
     
-    # # print summary
-    # print("-" * 50)
-    # print(f"{'Metric':<25} | {'Value':<15}")
-    # print("-" * 50)
-    # print(f"{'Task':<25} | {args_cli.task:<15}")
-    # print(f"{'Checkpoint':<25} | {Path(checkpoint).name:<15}")
-    # print(f"{'Episodes':<25} | {episode_id:<15}")
-    # print(f"{'Success Episodes':<25} | {success_cnt:<15}")
-    # print(f"{'Success Rate':<25} | {success_cnt / episode_id * 100:.1f}%")
-    # print(f"{'Timeout Episodes':<25} | {timeout_cnt:<15}")
-    # print(f"{'Timeout Rate':<25} | {timeout_cnt / episode_id * 100:.1f}%")
-    # print(f"{'Mean Reward':<25} | {sum(total_rewards) / len(total_rewards):.3f}")
-    # print(f"{'Mean Episode Length':<25} | {sum(episode_lengths) / len(episode_lengths):.1f}")
-    # if success_steps:
-    #     print(f"{'Mean Success Step':<25} | {sum(success_steps) / len(success_steps):.1f}")
-    # else:
-    #     print(f"{'Mean Success Step':<25} | N/A")
-    # print("-" * 50)
+    # simulate environment
+    while simulation_app.is_running():
+        # run everything in inference mode
+        with torch.inference_mode():
+            # compute actions
+            actions = policy(obs)
+            actions = torch.clamp(actions, min=-1, max=1)
+            # for i, data in enumerate(traj):
+            #     actions = data["action"].to(env.device)
+            #     if actions.ndim == 1:
+            #         actions = actions.unsqueeze(0)
+                # actions = actions.to(env.device)
+
+            # apply actions
+            # obs_dict = env.step(actions)[0]
+            obs_dict, rewards, terminated, truncated, info = env.step(actions)
+            # only cares about policy observations
+            obs = obs_dict["policy"].to(args_cli.device)
+    
+
+            episode_reward += rewards.mean().item()
+            episode_step += 1
+
+            success_log = info["log"]["Episode_Termination/object_lifted"]
+            timeout_log = info["log"]["Episode_Termination/time_out"]
+
+
+            # print("obs", obs.shape, obs[0, :10])
+            # print("actions", actions.shape, actions[0])
+            print(
+                # "step:", data["step"],
+                "epi_step:", episode_step,
+                "action shape:", actions.shape,
+                "action:", actions[0],
+                "terminated:", terminated,
+                "truncated:", truncated,
+            )
+            
+            if success_log > 0:
+                success_cnt += 1
+                success_steps.append(episode_step)
+                episode_lengths.append(episode_step)
+            
+            if timeout_log > 0:
+                timeout_cnt += 1
+
+            if (terminated | truncated).any():
+                episode_id += 1
+                total_rewards.append(episode_reward)
+                episode_lengths.append(episode_step)
+                
+                # reset
+                episode_reward = 0.0
+                episode_step = 0
+
+                obs_dict, _ = env.reset()
+                obs = obs_dict["policy"].to(args_cli.device)
+    
+    # print summary
+    print("-" * 50)
+    print(f"{'Metric':<25} | {'Value':<15}")
+    print("-" * 50)
+    print(f"{'Task':<25} | {args_cli.task:<15}")
+    print(f"{'Checkpoint':<25} | {Path(checkpoint).name:<15}")
+    print(f"{'Episodes':<25} | {episode_id:<15}")
+    print(f"{'Success Episodes':<25} | {success_cnt:<15}")
+    print(f"{'Success Rate':<25} | {success_cnt / episode_id * 100:.1f}%")
+    print(f"{'Timeout Episodes':<25} | {timeout_cnt:<15}")
+    print(f"{'Timeout Rate':<25} | {timeout_cnt / episode_id * 100:.1f}%")
+    print(f"{'Mean Reward':<25} | {sum(total_rewards) / len(total_rewards):.3f}")
+    print(f"{'Mean Episode Length':<25} | {sum(episode_lengths) / len(episode_lengths):.1f}")
+    if success_steps:
+        print(f"{'Mean Success Step':<25} | {sum(success_steps) / len(success_steps):.1f}")
+    else:
+        print(f"{'Mean Success Step':<25} | N/A")
+    print("-" * 50)
 
     # close the simulator
     env.close()
@@ -227,3 +256,4 @@ if __name__ == "__main__":
     main()
     # close sim app
     simulation_app.close()
+

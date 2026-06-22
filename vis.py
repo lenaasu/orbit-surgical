@@ -23,8 +23,8 @@ steps = [x["step"] for x in traj]
 rewards = [x["reward"].float().mean().item() for x in traj]
 # terminated = [x["terminated"].item() for x in traj]
 # truncated = [x["truncated"].item() for x in traj]
-success = [x["object_lifted"] for x in traj]
-timeout = [x["timeout"] for x in traj]
+success = [x["object_lifted_log"] for x in traj]
+timeout = [x["timeout_log"] for x in traj]
 
 # print(type(rewards))
 # print(rewards)
