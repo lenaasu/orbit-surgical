@@ -37,7 +37,7 @@ args = parser.parse_args()
 
 IL_DIR = Path(__file__).resolve().parent
 traj_dir = IL_DIR / "data" / "lift_n_trajs_1"
-save_path = IL_DIR / "policies" / "bc_lift_n_1_policy_200.pt"
+save_path = IL_DIR / "policies" / "bc_lift_n_1_policy_200v2.pt"
 
 all_obs = []
 all_acts = []
@@ -48,7 +48,7 @@ for traj_file in traj_files:
 
     for step in traj[:-1]:
         all_obs.append(step["obs"].flatten())
-        all_acts.append(step["action"].flatten())
+        all_acts.append(step["action"].flatten()[:3])  # only learn xyz
 
 obs = torch.stack(all_obs).float()
 acts = torch.stack(all_acts).float()
@@ -63,7 +63,7 @@ loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-policy = BCPolicy(obs_dim=34, act_dim=8).to(device)
+policy = BCPolicy(obs_dim=34, act_dim=3).to(device)
 
 
 optimizer = Adam(policy.parameters(), lr=1e-3)

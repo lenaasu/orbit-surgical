@@ -37,7 +37,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--checkpoint", type=str,
-    default="source/standalone/environments/imitation_learning/policies/bc_lift_n_1_policy_200.pt", 
+    default="source/standalone/environments/imitation_learning/policies/bc_lift_n_1_policy_200v2.pt", 
     help="Pytorch model checkpoint to load."
 )
 
@@ -175,8 +175,17 @@ def main():
         # run everything in inference mode
         with torch.inference_mode():
             # compute actions
-            actions = policy(obs)
-            actions = torch.clamp(actions, min=-1, max=1)
+            xyz = policy(obs)
+            actions = torch.zeros((obs.shape[0], 8), device=obs.device)
+            actions[:, :3] = xyz
+            actions[:, 3] = 1.0
+            actions[:,4:7] = 0.0
+            if episode_step < 80:
+                actions[:, 7] = 1.0
+            else:
+                actions[:, 7] = -1.0
+            # actions = policy(obs)
+            # actions = torch.clamp(actions, min=-1, max=1)
             # for i, data in enumerate(traj):
             #     actions = data["action"].to(env.device)
             #     if actions.ndim == 1:

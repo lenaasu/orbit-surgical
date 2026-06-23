@@ -8,14 +8,15 @@ import plotly.graph_objects as go
 # load trajectory
 # os.makedirs("results", exist_ok=True)
 
-FILE_NAME = "lift_n_1_success_ep2"
+FILE_NAME = "lift_n_1_200_bc_policy"
 num_envs = 1
 DECIMATION = 4
 SIM_DT = 1.0 / 200.0
 EPISODE_LENGTH_S = 8.0
 traj = torch.load(f"{FILE_NAME}.pt", map_location="cpu", weights_only=True)
 
-
+print(type(traj))
+print(traj)
 # extract params
 ee = torch.cat([x["ee_pos"] for x in traj], dim=0).numpy()
 object = torch.cat([x["object_pos"] for x in traj], dim=0).numpy()
