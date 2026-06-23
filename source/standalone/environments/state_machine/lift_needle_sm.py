@@ -82,7 +82,7 @@ class PickSmWaitTime:
     REST = wp.constant(0.5)
     APPROACH_ABOVE_OBJECT = wp.constant(1.0)
     APPROACH_OBJECT = wp.constant(0.7)
-    GRASP_OBJECT = wp.constant(0.5)
+    GRASP_OBJECT = wp.constant(0.8)
     LIFT_OBJECT = wp.constant(2.0)
 
 
@@ -139,13 +139,19 @@ def infer_state_machine(
             sm_wait_time[tid] = 0.0
     elif state == PickSmState.LIFT_OBJECT:
         des_ee_pose[tid] = des_object_pose[tid]
+        # des_ee_pose[tid] = wp.transform_multiply(offset[tid], object_pose)
         gripper_state[tid] = GripperState.CLOSE
         # TODO: error between current and desired ee pose below threshold
         # wait for a while
         if sm_wait_time[tid] >= PickSmWaitTime.LIFT_OBJECT:
             # move to next state and reset wait time
             sm_state[tid] = PickSmState.LIFT_OBJECT
+            # sm_state[tid] = PickSmState.COMPLETE
             sm_wait_time[tid] = 0.0
+    # elif state == PickSmState.COMPLETE:
+    #     des_ee_pose[tid] = des_ee_pose[tid]
+    #     gripper_state[tid] = GripperState.CLOSE
+
     # increment wait time
     sm_wait_time[tid] = sm_wait_time[tid] + dt[tid]
 
@@ -188,7 +194,8 @@ class PickAndLiftSm:
 
         # approach above object offset
         self.offset = torch.zeros((self.num_envs, 7), device=self.device)
-        self.offset[:, 2] = 0.05
+        # self.offset[:, 2] = 0.05
+        self.offset[:, 2] = 0.01
         self.offset[:, -1] = 1.0  # warp expects quaternion as (x, y, z, w)
 
         # convert to warp
@@ -264,10 +271,10 @@ def main():
     #     episode_trigger=lambda episode_id:True
     #     )
     
-    env = raw_env.unwrapped
+    base_env = raw_env.unwrapped
     # reset environment at start
     raw_env.reset()
-    env.sim.step()
+    base_env.sim.step()
 
     # create action buffers (position + quaternion)
     # actions = torch.zeros(env.unwrapped.action_space.shape, device=env.unwrapped.device)
@@ -276,70 +283,156 @@ def main():
     # # create state machine
     # pick_sm = PickAndLiftSm(env_cfg.sim.dt * env_cfg.decimation, env.unwrapped.num_envs, env.unwrapped.device)
 
-    actions = torch.zeros(env.action_space.shape, device=env.device)
+    actions = torch.zeros(base_env.action_space.shape, device=base_env.device)
     actions[:, 3] = 1.0
 
-    pick_sm = PickAndLiftSm(env_cfg.sim.dt * env_cfg.decimation, env.num_envs, env.device)
+    pick_sm = PickAndLiftSm(env_cfg.sim.dt * env_cfg.decimation, base_env.num_envs, base_env.device)
 
     # Create traj set
-    traj = []
-
+    episode_traj = []
+    success_traj = []
+    episode_id = 1
+    episode_step = 0
+    # episode_length = env_cfg.episode_length_s / (env_cfg.sim.dt * env_cfg.decimation)
+    episode_length = base_env.max_episode_length
+    
+    
     step_cnt = 0
-    max_steps = 300
+    success_cnt = 0
+    num_episodes = 3 # set number of episodes
+    target_success = 100 # set number of successful trajs
+    episode_saved = False # init bool for saving traj
+    # max_steps = num_episodes * episode_length
+    
     while simulation_app.is_running():
         # run everything in inference mode
         with torch.inference_mode():
+            # executed_actions = actions.clone()
+
             # step environment
-            # dones = env.step(actions)[-2]
-            dones = raw_env.step(actions)[-2]
-            
+            obs_dict, reward, terminated, truncated, info = raw_env.step(actions)
+            dones = terminated | truncated
+            # dones = raw_env.step(actions)[-2]
+
+            # success
+            # object_listed = base_env.termination_manager.get_term["object_lifted"]
+            success_log = info["log"]["Episode_Termination/object_lifted"]
+            # success_cnt += 1
+            timeout_log = info["log"]["Episode_Termination/time_out"]
+            # timeout_cnt += 1
 
             # observations
-            robot: RigidObject = env.scene["robot"]
+            robot: RigidObject = base_env.scene["robot"]
             # -- end-effector frame
-            ee_frame_sensor = env.scene["ee_frame"]
-            tcp_rest_position = ee_frame_sensor.data.target_pos_w[..., 0, :].clone() - env.scene.env_origins
+            ee_frame_sensor = base_env.scene["ee_frame"]
+            tcp_rest_position = ee_frame_sensor.data.target_pos_w[..., 0, :].clone() - base_env.scene.env_origins
             tcp_rest_position_b, _ = subtract_frame_transforms(
                 robot.data.root_state_w[:, :3], robot.data.root_state_w[:, 3:7], tcp_rest_position
             )
             tcp_rest_orientation = ee_frame_sensor.data.target_quat_w[..., 0, :].clone()
             # -- object frame
-            object_data: RigidObjectData = env.scene["object"].data
-            object_position = object_data.root_pos_w - env.scene.env_origins
+            object_data: RigidObjectData = base_env.scene["object"].data
+            object_position = object_data.root_pos_w - base_env.scene.env_origins
             object_position_b, _ = subtract_frame_transforms(
                 robot.data.root_state_w[:, :3], robot.data.root_state_w[:, 3:7], object_position
             )
             object_orientation = object_data.root_quat_w
             # -- target object frame
             # desired_pose = env.unwrapped.command_manager.get_command("object_pose")
-            desired_pose = env.command_manager.get_command("object_pose")
+            desired_pose = base_env.command_manager.get_command("object_pose")
 
-            # advance state machine
-            actions = pick_sm.compute(
-                torch.cat([tcp_rest_position_b, tcp_rest_orientation], dim=-1),
-                torch.cat([object_position_b, object_orientation], dim=-1),
-                desired_pose,
-            )
+
+            if step_cnt % 10 == 0:
+                print("step: ", step_cnt)
+                print("episode: ", episode_id)
+                print("success_cnt: ", success_cnt)
+                print("obs_dict_policy: ", obs_dict["policy"])
+                # print("ee pose input[0]: ", torch.cat([tcp_rest_position_b, tcp_rest_orientation], dim=-1))
+                # print("object pose input[0]: ", torch.cat([object_position_b, object_orientation], dim=-1))
+                # print("desired object pose[0]: ", desired_pose[0])
+                # print("actions shape: ", actions.shape)
+                # print("actions[0]: ", actions[0])
+                print("sm_state: ", pick_sm.sm_state)
+                # print("gripper: ", actions[0, 7])
+                # print("object_z: ", object_position_b[0, 2])
+                # print("ee_z: ", tcp_rest_position_b[0, 2])
+                # print("success: ", success)
+                print("terminated: ", terminated)
+                print("truncated: ", truncated)
+                # print(info)
 
             # Add traj
-            if step_cnt % 5 == 0:
-                traj.append({
-                    "step": step_cnt,
-                    "ee_pos": tcp_rest_position.detach().cpu(),
-                    "needle_pos": object_position.detach().cpu(),
-                    "action": actions.detach().cpu(),
-                })
+            # if step_cnt % 5 == 0:
+            episode_traj.append({
+                "step": step_cnt,
+                "episode_id": episode_id,
+                "sm_state": pick_sm.sm_state.detach().cpu(),
 
+                "obs": obs_dict["policy"].cpu(),
+                "action": actions.detach().cpu(),
+                "reward": reward.detach().cpu(),
+                "ee_pos": tcp_rest_position.detach().cpu(),
+                "object_pos": object_position.detach().cpu(),
+                
+                "terminated": terminated.detach().cpu(),
+                "truncated": truncated.detach().cpu(),
+                "object_lifted_log": success_log,
+                "timeout_log": timeout_log,
+            })
+            # if success == 1:
+            if success_log > 0 and not episode_saved and len(episode_traj) > 50:
+                success_cnt += 1
+                episode_saved = True
+                
+                torch.save(episode_traj, f"source/standalone/environments/imitation_learning/lift_n_trajs_100_v2/lift_n_1_success_ep{episode_id}.pt")
+                # print(f"Saved success traj at ep{episode_id}.")
+                
+       
             # reset state machine
-            if dones.any():
+            if dones.any() or success_log > 0:
+                # if success > 0:
+                #     success_cnt += 1
+                #     torch.save(episode_traj, f"lift_n_1_3_success_ep{episode_id}.pt")
+                    # print(f"Saved success traj at ep{episode_id}.")
+                    
+
                 pick_sm.reset_idx(dones.nonzero(as_tuple=False).squeeze(-1))
+                episode_traj = []
+                episode_id += 1
+                episode_step = 0
+                episode_saved = False
+
+                episode_initial_object_z = None
+                raw_env.reset()
+                base_env.sim.step()
+                actions = torch.zeros(base_env.action_space.shape, device=base_env.device)
+                actions[:, 3] = 1.0
+
+                step_cnt += 1
+
+                # if episode_id > num_episodes:
+                #     break
+                
+                if success_cnt >= target_success:
+                    break
+                
+                continue
             
-            step_cnt += 1
-            if step_cnt > max_steps:
-                break
+            else:
+                episode_step += 1
+
+                # advance state machine
+                actions = pick_sm.compute(
+                    torch.cat([tcp_rest_position_b, tcp_rest_orientation], dim=-1),
+                    torch.cat([object_position_b, object_orientation], dim=-1),
+                    desired_pose,
+                    
+                )
+                step_cnt += 1
+            
     # Save traj
-    torch.save(traj, "lift_needle_traj.pt")
-    print("Saved trajectory to lift_needle_traj.pt")
+    # torch.save(episode_traj, "lift_n_1_3.pt")
+    # print("Saved trajectory to lift_n.pt")
     # close the environment
     raw_env.close()
 

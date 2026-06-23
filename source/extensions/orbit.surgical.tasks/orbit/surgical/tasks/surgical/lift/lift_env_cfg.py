@@ -18,15 +18,25 @@ from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
-from isaaclab.sensors.frame_transformer.frame_transformer_cfg import FrameTransformerCfg
+# from isaaclab.sensors.frame_transformer.frame_transformer_cfg import FrameTransformerCfg
+from isaaclab.sensors import CameraCfg, FrameTransformerCfg
 from isaaclab.sim.spawners.from_files.from_files_cfg import GroundPlaneCfg, UsdFileCfg
 from isaaclab.utils.configclass import configclass
-
+import torch
 from . import mdp
 
 ##
 # Scene definition
 ##
+
+def object_lifted(
+        env: ManagerBasedRLEnvCfg,
+        threshold: float,
+) -> torch.Tensor:
+    object = env.scene["object"]
+    current_z = object.data.root_pos_w[:, 2]
+    initial_z = object.data.default_root_state[:, 2]
+    return (current_z - initial_z) > threshold
 
 
 @configclass
@@ -62,6 +72,26 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         prim_path="/World/light",
         spawn=sim_utils.DomeLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
+
+    # # sensors
+    # camera = CameraCfg(
+    #     prim_path="{ENV_REGEX_NS}/Camera",
+    #     update_period=0.1,
+    #     height=64,
+    #     width=64,
+    #     data_types=["rgb"],
+    #     spawn=sim_utils.PinholeCameraCfg(
+    #         focal_length=24.0,
+    #         focus_distance=400.0,
+    #         horizontal_aperture=20.955,
+    #         clipping_range=(0.1, 1.0e5),
+    #     ),
+    #     offset=CameraCfg.OffsetCfg(
+    #         pos=(0.25, 0.0, 0.25),
+    #         rot=(0.707, 0.0, 0.707, 0.0),
+    #         convention="ros",
+    #     ),
+    # )
 
 
 ##
@@ -133,8 +163,19 @@ class EventCfg:
         func=mdp.reset_root_state_uniform,
         mode="reset",
         params={
-            "pose_range": {"x": (-0.03, 0.03), "y": (-0.03, 0.03), "z": (0.0, 0.0)},
-            "velocity_range": {},
+            "pose_range": {
+                "x": (-0.03, 0.03), 
+                "y": (-0.03, 0.03), 
+                "z": (0.00, 0.00)
+                },
+            "velocity_range": {
+                "x": (0.0, 0.0),
+                "y": (0.0, 0.0),
+                "z": (0.0, 0.0),
+                "roll": (0.0, 0.0),
+                "pitch": (0.0, 0.0),
+                "yaw": (0.0, 0.0),
+            },
             "asset_cfg": SceneEntityCfg("object", body_names="Object"),
         },
     )
@@ -180,6 +221,11 @@ class TerminationsCfg:
         func=mdp.root_height_below_minimum, params={"minimum_height": -0.05, "asset_cfg": SceneEntityCfg("object")}
     )
 
+    # success condition
+    object_lifted = DoneTerm(
+        func=object_lifted, params={"threshold": 0.02},
+    )
+
 
 @configclass
 class CurriculumCfg:
@@ -220,8 +266,9 @@ class LiftEnvCfg(ManagerBasedRLEnvCfg):
         # general settings
         self.decimation = 4
         self.sim.render_interval = self.decimation
-        self.episode_length_s = 2.0
+        # self.episode_length_s = 2.0
+        self.episode_length_s = 8.0
         # simulation settings
-        self.sim.dt = 1.0 / 200.0
+        self.sim.dt = 1.0 / 200.0 # Episode length = episode_length_s / sim.dt
         self.viewer.eye = (0.2, 0.2, 0.1)
         self.viewer.lookat = (0.0, 0.0, 0.04)
