@@ -37,7 +37,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--checkpoint", type=str,
-    default="source/standalone/environments/imitation_learning/policies/bc_lift_n_1_policy_200v2.pt", 
+    default="source/standalone/environments/imitation_learning/policies/bc_lift_n_100_policy_200.pt", 
     help="Pytorch model checkpoint to load."
 )
 
@@ -176,14 +176,23 @@ def main():
         with torch.inference_mode():
             # compute actions
             xyz = policy(obs)
+            xyz = torch.clamp(xyz, -1.0, 1.0)
             actions = torch.zeros((obs.shape[0], 8), device=obs.device)
             actions[:, :3] = xyz
             actions[:, 3] = 1.0
             actions[:,4:7] = 0.0
-            if episode_step < 80:
+            if episode_step < 180:
                 actions[:, 7] = 1.0
+            elif episode_step < 300:
+                actions[:, 7] = -1.0
             else:
                 actions[:, 7] = -1.0
+                # lift
+                # actions[:, 0] = 0.0435
+                # actions[:, 1] = 0.0482
+                actions[:, 2] = -0.1000
+                # alpha = min((episode_step - 80) / 50.0, 1.0)
+                # actions[:, 2] = (1 - alpha) * actions[:, 2] + alpha * (-0.08)
             # actions = policy(obs)
             # actions = torch.clamp(actions, min=-1, max=1)
             # for i, data in enumerate(traj):
@@ -197,6 +206,9 @@ def main():
             obs_dict, rewards, terminated, truncated, info = env.step(actions)
             # only cares about policy observations
             obs = obs_dict["policy"].to(args_cli.device)
+
+            # ee_pos = env.unwrapped.scene["robot"].data.body_pos_w[:, ee_body_id]
+            object_pos = env.unwrapped.scene["object"].data.root_pos_w
     
 
             episode_reward += rewards.mean().item()
@@ -205,27 +217,35 @@ def main():
             success_log = info["log"]["Episode_Termination/object_lifted"]
             timeout_log = info["log"]["Episode_Termination/time_out"]
 
+            if success_log > 0 and terminated.any():
+                success_cnt += 1
+                success_steps.append(episode_step)
+                episode_lengths.append(episode_step)
+            
+            if timeout_log > 0 and truncated.any():
+                timeout_cnt += 1
 
             # print("obs", obs.shape, obs[0, :10])
             # print("actions", actions.shape, actions[0])
             print(
                 # "step:", data["step"],
+                "epi_id:", episode_id,
                 "epi_step:", episode_step,
-                "action shape:", actions.shape,
-                "action:", actions[0],
+                # "action shape:", actions.shape,
+                # "action:", actions[0],
+                "success:", success_cnt,
+                "timeout:", timeout_cnt,
                 "terminated:", terminated,
                 "truncated:", truncated,
+                "object_z:", object_pos[0, 2],
+                "ee_z:", actions[:, 2],
+                # "action[0,0:3]:", actions[0,0:3],
             )
-            
-            if success_log > 0:
-                success_cnt += 1
-                success_steps.append(episode_step)
-                episode_lengths.append(episode_step)
-            
-            if timeout_log > 0:
-                timeout_cnt += 1
 
             if (terminated | truncated).any():
+                if episode_id >= num_episodes:
+                    break
+                
                 episode_id += 1
                 total_rewards.append(episode_reward)
                 episode_lengths.append(episode_step)
@@ -242,7 +262,7 @@ def main():
     print(f"{'Metric':<25} | {'Value':<15}")
     print("-" * 50)
     print(f"{'Task':<25} | {args_cli.task:<15}")
-    print(f"{'Checkpoint':<25} | {Path(checkpoint).name:<15}")
+    print(f"{'Checkpoint':<25} | {Path(checkpoint_path).name:<15}")
     print(f"{'Episodes':<25} | {episode_id:<15}")
     print(f"{'Success Episodes':<25} | {success_cnt:<15}")
     print(f"{'Success Rate':<25} | {success_cnt / episode_id * 100:.1f}%")

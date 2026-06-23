@@ -80,9 +80,9 @@ class AnalyzeTrajs:
 
 def main():    
     IL_DIR = Path(__file__).resolve().parent
-    traj_dir = IL_DIR / "data" / "lift_n_trajs_100"
-    save_stats_path = IL_DIR / "results" / "lift_n_100_stats.csv"
-    save_summary_path = IL_DIR / "results" / "lift_n_100_summary.csv"
+    traj_dir = IL_DIR / "data" / "lift_n_trajs_100_v2"
+    save_stats_path = IL_DIR / "results" / "lift_n_100v2_stats.csv"
+    save_summary_path = IL_DIR / "results" / "lift_n_100v2_summary.csv"
 
     # # load trajs
     # traj_files = sorted(
